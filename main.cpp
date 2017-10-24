@@ -48,6 +48,59 @@ void makeFFT(){
 }
 
 
+
+
+/**
+ *  (0,0) in top left corner
+ *
+ *  Take the average from each of the 9 pixels in the neighbourhood
+ *  _  _  _
+ * |16|26|16|
+ * |26|41|26|
+ * |16|26|16|
+ * **/
+float getGaussianSmoothing(int x,int y,Mat image){
+    // work out the values of each pixel in the neighbourhood
+    int m11 = image.at<uchar>(x-1,y-1)*16;
+    int m12 = image.at<uchar>(x,y-1)*26;
+    int m13 = image.at<uchar>(x+1,y-1)*16;
+    int m21 = image.at<uchar>(x-1,y)*26;
+    int m22 = image.at<uchar>(x,y)*41;
+    int m23 = image.at<uchar>(x+1,y)*26;
+    int m31 = image.at<uchar>(x-1,y+1)*16;
+    int m32 = image.at<uchar>(x,y+1)*26;
+    int m33 = image.at<uchar>(x+1,y+1)*16;
+    // sum up all the pixels and take the average
+    return (1/209.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
+}
+
+void gaussianSmoothing(const char *file, const char *name){
+    // neighbourhood averaging
+    Mat image;
+    Mat newImage;
+    image = imread(file,CV_LOAD_IMAGE_GRAYSCALE);
+
+    if(!image.data){
+        // if the image failed to open output error message
+        cout << "Image failed to open" << endl;
+    } else{
+        // create a new image the size of the old one with 8 bits on once channel (greyscale)
+        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+        for(int x=0;x<image.rows;x++){
+            for(int y=0;y<image.cols;y++){
+                // For each pixel get the neighbourhood of pixels and get the average from them
+                newImage.at<uchar>(x,y) = getGaussianSmoothing(x, y, image);
+            }
+        }
+    }
+
+    namedWindow( "gaussian Smoothing image", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "gaussian Smoothing image", newImage );
+    namedWindow( "original image", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "original image", image );
+    waitKey(0);
+}
+
 /**
  *  (0,0) in top left corner
  *
@@ -71,6 +124,7 @@ float getNeighbourhood(int x,int y,Mat image){
     // sum up all the pixels and take the average
     return (1/9.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
 }
+
 
 void neighbourhoodAverage(const char *file, const char *name){
     // neighbourhood averaging
@@ -97,9 +151,6 @@ void neighbourhoodAverage(const char *file, const char *name){
     namedWindow( "original image", WINDOW_AUTOSIZE );// Create a window for display.
     imshow( "original image", image );
     waitKey(0);
-
-
-
 }
 
 int main() {
@@ -107,5 +158,6 @@ int main() {
    // showImage("../PandaOriginal.bmp" ,  "Panda Original");
    // makeDFT("../PandaNoise.bmp","Panda Noise");
     neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
+    gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
     return 0;
 }
