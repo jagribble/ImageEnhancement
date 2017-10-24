@@ -1,0 +1,3 @@
+/Users/G/Desktop/Year3/ImageAnalysis/coursework1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/G/Desktop/Year3/ImageAnalysis/coursework1/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/G/Desktop/Year3/ImageAnalysis/coursework1/cmake-build-debug/CMakeFiles/coursework1.dir
