@@ -6,6 +6,30 @@
 using namespace std;
 using namespace cv;
 
+void showImage(const char *file, const char *name);
+// function definitions for median filtering
+void medianFilter(const String &file, Mat img);
+int median(int x,int y,Mat image);
+void getMatrix(int x,int y,Mat image, int matrix[]);
+
+// function definitions for gaussian smoothing
+Mat gaussianSmoothing(const char *file, const char *name);
+float getGaussianSmoothing(int x,int y,Mat image);
+// function definitions for neighbourhood averaging
+Mat neighbourhoodAverage(const char *file, const char *name);
+float getNeighbourhood(int x,int y,Mat image);
+
+
+int main() {
+    cout << "Hello, World!" << endl;
+    showImage("../PandaNoise.bmp" ,  "Panda Noise");
+    // makeDFT("../PandaNoise.bmp","Panda Noise");
+    Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
+    Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
+    medianFilter("",neigbourhoodAvg);
+    return 0;
+}
+
 void showImage(const char *file, const char *name){
     Mat image;
 
@@ -48,29 +72,6 @@ void makeFFT(){
 
 }
 
-
-void getMatrix(int x,int y,Mat image, int matrix[]){
-    matrix[0] = image.at<uchar>(x-1,y-1);
-    matrix[1] = image.at<uchar>(x,y-1);
-    matrix[2] = image.at<uchar>(x+1,y-1);
-    matrix[3] = image.at<uchar>(x-1,y);
-    matrix[4] = image.at<uchar>(x,y);
-    matrix[5] = image.at<uchar>(x+1,y);
-    matrix[6] = image.at<uchar>(x-1,y+1);
-    matrix[7] = image.at<uchar>(x,y+1);
-    matrix[8] = image.at<uchar>(x+1,y+1);
-}
-
-int median(int x,int y,Mat image){
-    int matrix[8];
-    int sortedMatrix[8];
-    // get neighbourhood matrix
-    getMatrix(x,y,image,matrix);
-    // sort the array so you are able to grab the median
-    sort(matrix,matrix+9);
-    //cout << matrix[0] <<" ,"<< matrix[1] <<" ," << matrix[2] <<" ," << matrix[3] <<" ," << matrix[4] <<" ,"<< matrix[5]  <<" ,"<< matrix[6] <<" ," << matrix[7] <<" ," << matrix[8] <<endl;
-    return matrix[4];
-}
 
 /**
  * Meadian filter
@@ -123,6 +124,29 @@ void medianFilter(const String &file, Mat img){
     waitKey(0);
 }
 
+void getMatrix(int x,int y,Mat image, int matrix[]){
+    matrix[0] = image.at<uchar>(x-1,y-1);
+    matrix[1] = image.at<uchar>(x,y-1);
+    matrix[2] = image.at<uchar>(x+1,y-1);
+    matrix[3] = image.at<uchar>(x-1,y);
+    matrix[4] = image.at<uchar>(x,y);
+    matrix[5] = image.at<uchar>(x+1,y);
+    matrix[6] = image.at<uchar>(x-1,y+1);
+    matrix[7] = image.at<uchar>(x,y+1);
+    matrix[8] = image.at<uchar>(x+1,y+1);
+}
+
+int median(int x,int y,Mat image){
+    int matrix[8];
+    int sortedMatrix[8];
+    // get neighbourhood matrix
+    getMatrix(x,y,image,matrix);
+    // sort the array so you are able to grab the median
+    sort(matrix,matrix+9);
+    //cout << matrix[0] <<" ,"<< matrix[1] <<" ," << matrix[2] <<" ," << matrix[3] <<" ," << matrix[4] <<" ,"<< matrix[5]  <<" ,"<< matrix[6] <<" ," << matrix[7] <<" ," << matrix[8] <<endl;
+    return matrix[4];
+}
+
 
 
 
@@ -135,20 +159,7 @@ void medianFilter(const String &file, Mat img){
  * |26|41|26|
  * |16|26|16|
  * **/
-float getGaussianSmoothing(int x,int y,Mat image){
-    // work out the values of each pixel in the neighbourhood
-    int m11 = image.at<uchar>(x-1,y-1)*16;
-    int m12 = image.at<uchar>(x,y-1)*26;
-    int m13 = image.at<uchar>(x+1,y-1)*16;
-    int m21 = image.at<uchar>(x-1,y)*26;
-    int m22 = image.at<uchar>(x,y)*41;
-    int m23 = image.at<uchar>(x+1,y)*26;
-    int m31 = image.at<uchar>(x-1,y+1)*16;
-    int m32 = image.at<uchar>(x,y+1)*26;
-    int m33 = image.at<uchar>(x+1,y+1)*16;
-    // sum up all the pixels and take the average
-    return (1/209.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
-}
+
 
 Mat gaussianSmoothing(const char *file, const char *name){
     // neighbourhood averaging
@@ -178,6 +189,21 @@ Mat gaussianSmoothing(const char *file, const char *name){
     return newImage;
 }
 
+float getGaussianSmoothing(int x,int y,Mat image){
+    // work out the values of each pixel in the neighbourhood
+    int m11 = image.at<uchar>(x-1,y-1)*16;
+    int m12 = image.at<uchar>(x,y-1)*26;
+    int m13 = image.at<uchar>(x+1,y-1)*16;
+    int m21 = image.at<uchar>(x-1,y)*26;
+    int m22 = image.at<uchar>(x,y)*41;
+    int m23 = image.at<uchar>(x+1,y)*26;
+    int m31 = image.at<uchar>(x-1,y+1)*16;
+    int m32 = image.at<uchar>(x,y+1)*26;
+    int m33 = image.at<uchar>(x+1,y+1)*16;
+    // sum up all the pixels and take the average
+    return (1/209.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
+}
+
 /**
  *  (0,0) in top left corner
  *
@@ -187,22 +213,6 @@ Mat gaussianSmoothing(const char *file, const char *name){
  * |_|x|_|
  * |_|_|_|
  * **/
-float getNeighbourhood(int x,int y,Mat image){
-    // work out the values of each pixel in the neighbourhood
-    int m11 = image.at<uchar>(x-1,y-1);
-    int m12 = image.at<uchar>(x,y-1);
-    int m13 = image.at<uchar>(x+1,y-1);
-    int m21 = image.at<uchar>(x-1,y);
-    int m22 = image.at<uchar>(x,y);
-    int m23 = image.at<uchar>(x+1,y);
-    int m31 = image.at<uchar>(x-1,y+1);
-    int m32 = image.at<uchar>(x,y+1);
-    int m33 = image.at<uchar>(x+1,y+1);
-    // sum up all the pixels and take the average
-    return (1/9.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
-}
-
-
 Mat neighbourhoodAverage(const char *file, const char *name){
     // neighbourhood averaging
     Mat image;
@@ -230,12 +240,18 @@ Mat neighbourhoodAverage(const char *file, const char *name){
     return newImage;
 }
 
-int main() {
-    cout << "Hello, World!" << endl;
-    showImage("../PandaNoise.bmp" ,  "Panda Noise");
-   // makeDFT("../PandaNoise.bmp","Panda Noise");
-    Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
-    Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
-    medianFilter("",neigbourhoodAvg);
-    return 0;
+float getNeighbourhood(int x,int y,Mat image){
+    // work out the values of each pixel in the neighbourhood
+    int m11 = image.at<uchar>(x-1,y-1);
+    int m12 = image.at<uchar>(x,y-1);
+    int m13 = image.at<uchar>(x+1,y-1);
+    int m21 = image.at<uchar>(x-1,y);
+    int m22 = image.at<uchar>(x,y);
+    int m23 = image.at<uchar>(x+1,y);
+    int m31 = image.at<uchar>(x-1,y+1);
+    int m32 = image.at<uchar>(x,y+1);
+    int m33 = image.at<uchar>(x+1,y+1);
+    // sum up all the pixels and take the average
+    return (1/9.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
 }
+
