@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
@@ -48,6 +49,81 @@ void makeFFT(){
 }
 
 
+void getMatrix(int x,int y,Mat image, int matrix[]){
+    matrix[0] = image.at<uchar>(x-1,y-1);
+    matrix[1] = image.at<uchar>(x,y-1);
+    matrix[2] = image.at<uchar>(x+1,y-1);
+    matrix[3] = image.at<uchar>(x-1,y);
+    matrix[4] = image.at<uchar>(x,y);
+    matrix[5] = image.at<uchar>(x+1,y);
+    matrix[6] = image.at<uchar>(x-1,y+1);
+    matrix[7] = image.at<uchar>(x,y+1);
+    matrix[8] = image.at<uchar>(x+1,y+1);
+}
+
+int median(int x,int y,Mat image){
+    int matrix[8];
+    // get neighbourhood matrix
+    getMatrix(x,y,image,matrix);
+    // sort the array so you are able to grab the median
+    sort(matrix,matrix);
+
+    cout << matrix[0] <<" ,"<< matrix[1] <<" ," << matrix[2] <<" ," << matrix[3] <<" ," << matrix[4] <<" ,"<< matrix[5]  <<" ,"<< matrix[6] <<" ," << matrix[7] <<" ," << matrix[8] <<endl;
+    return matrix[4];
+}
+
+/**
+ * Meadian filter
+ * e.g
+ *  _ _ _
+ * |1|2|1|
+ * |2|4|6|
+ * |1|2|1|
+ *
+ * = 1,1,1,1,2,2,2,4,6 (sorted)
+ *
+ * median value = 2
+ *
+ * **/
+void medianFilter(const char *file, Mat img){
+    Mat image;
+    Mat newImage;
+    if(img.data != NULL){
+        image = img;
+        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+        for(int x=0;x<image.rows;x++){
+            for(int y=0;y<image.cols;y++){
+
+                newImage.at<uchar>(x,y) = median(x,y,image);
+            }
+        }
+    }
+    if(file != ""){
+
+
+    image = imread(file,CV_LOAD_IMAGE_GRAYSCALE);
+
+    if(!image.data){
+        // if the image failed to open output error message
+        cout << "Image failed to open" << endl;
+    } else{
+        // create a new image the size of the old one with 8 bits on once channel (greyscale)
+        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+        for(int x=0;x<image.rows;x++){
+            for(int y=0;y<image.cols;y++){
+
+                newImage.at<uchar>(x,y) = median(x,y,image);
+            }
+        }
+
+    }
+    }
+    namedWindow( "median filter", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "median filter", newImage );
+    waitKey(0);
+}
+
+
 
 
 /**
@@ -74,7 +150,7 @@ float getGaussianSmoothing(int x,int y,Mat image){
     return (1/209.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
 }
 
-void gaussianSmoothing(const char *file, const char *name){
+Mat gaussianSmoothing(const char *file, const char *name){
     // neighbourhood averaging
     Mat image;
     Mat newImage;
@@ -96,9 +172,10 @@ void gaussianSmoothing(const char *file, const char *name){
 
     namedWindow( "gaussian Smoothing image", WINDOW_AUTOSIZE );// Create a window for display.
     imshow( "gaussian Smoothing image", newImage );
-    namedWindow( "original image", WINDOW_AUTOSIZE );// Create a window for display.
-    imshow( "original image", image );
+
     waitKey(0);
+
+    return newImage;
 }
 
 /**
@@ -126,7 +203,7 @@ float getNeighbourhood(int x,int y,Mat image){
 }
 
 
-void neighbourhoodAverage(const char *file, const char *name){
+Mat neighbourhoodAverage(const char *file, const char *name){
     // neighbourhood averaging
     Mat image;
     Mat newImage;
@@ -148,16 +225,17 @@ void neighbourhoodAverage(const char *file, const char *name){
 
     namedWindow( "neighbourhood Average image", WINDOW_AUTOSIZE );// Create a window for display.
     imshow( "neighbourhood Average image", newImage );
-    namedWindow( "original image", WINDOW_AUTOSIZE );// Create a window for display.
-    imshow( "original image", image );
+
     waitKey(0);
+    return newImage;
 }
 
 int main() {
     cout << "Hello, World!" << endl;
-   // showImage("../PandaOriginal.bmp" ,  "Panda Original");
+    showImage("../PandaNoise.bmp" ,  "Panda Noise");
    // makeDFT("../PandaNoise.bmp","Panda Noise");
-    neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
-    gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
+    Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
+    Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
+    medianFilter("",neigbourhoodAvg);
     return 0;
 }
