@@ -7,8 +7,12 @@ using namespace std;
 using namespace cv;
 
 void showImage(const char *file, const char *name);
+// function definitions for image Averaging
+Mat imageAveraging(Mat images[],int n);
+float pixelAverage(int x, int y, Mat images[],int n);
+
 // function definitions for median filtering
-void medianFilter(const String &file, Mat img);
+Mat medianFilter(const String &file, Mat img);
 int median(int x,int y,Mat image);
 void getMatrix(int x,int y,Mat image, int matrix[]);
 
@@ -26,7 +30,10 @@ int main() {
     // makeDFT("../PandaNoise.bmp","Panda Noise");
     Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
     Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
-    medianFilter("",neigbourhoodAvg);
+    Mat median = medianFilter("",neigbourhoodAvg);
+    Mat images[3] = {neigbourhoodAvg,gaussian,median};
+    Mat average = imageAveraging(images,3);
+    showImage("../PandaOriginal.bmp","Panda original");
     return 0;
 }
 
@@ -72,6 +79,34 @@ void makeFFT(){
 
 }
 
+/**
+ * Image Averaging
+ *
+ * Many images pixel added together and divided by the amount of noisy pictures
+ *
+ * g(x,y) = 1/N*(f(x,y)+n(x,y)+..)
+ * **/
+Mat imageAveraging(Mat images[],int n){
+    Mat newImage;
+    newImage = Mat::zeros(images[0].rows,images[0].cols, CV_8UC1);
+    for(int x=0;x<images[0].rows;x++){
+        for(int y=0;y<images[0].cols;y++){
+            newImage.at<uchar>(x,y) = pixelAverage(x,y,images,n);
+        }
+    }
+    namedWindow( "image averaging", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "image averaging", newImage );
+    waitKey(0);
+    return newImage;
+}
+
+float pixelAverage(int x, int y, Mat images[],int n){
+    int total = 0;
+    for(int i=0;i<n;i++){
+        total += images[i].at<uchar>(x,y);
+    }
+    return total/n;
+}
 
 /**
  * Meadian filter
@@ -86,7 +121,7 @@ void makeFFT(){
  * median value = 2
  *
  * **/
-void medianFilter(const String &file, Mat img){
+Mat medianFilter(const String &file, Mat img){
     Mat image;
     Mat newImage;
     if(img.data != NULL){
@@ -122,6 +157,7 @@ void medianFilter(const String &file, Mat img){
     namedWindow( "median filter", WINDOW_AUTOSIZE );// Create a window for display.
     imshow( "median filter", newImage );
     waitKey(0);
+    return newImage;
 }
 
 void getMatrix(int x,int y,Mat image, int matrix[]){
