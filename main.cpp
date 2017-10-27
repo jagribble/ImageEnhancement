@@ -63,12 +63,12 @@ void getMatrix(int x,int y,Mat image, int matrix[]){
 
 int median(int x,int y,Mat image){
     int matrix[8];
+    int sortedMatrix[8];
     // get neighbourhood matrix
     getMatrix(x,y,image,matrix);
     // sort the array so you are able to grab the median
-    sort(matrix,matrix);
-
-    cout << matrix[0] <<" ,"<< matrix[1] <<" ," << matrix[2] <<" ," << matrix[3] <<" ," << matrix[4] <<" ,"<< matrix[5]  <<" ,"<< matrix[6] <<" ," << matrix[7] <<" ," << matrix[8] <<endl;
+    sort(matrix,matrix+9);
+    //cout << matrix[0] <<" ,"<< matrix[1] <<" ," << matrix[2] <<" ," << matrix[3] <<" ," << matrix[4] <<" ,"<< matrix[5]  <<" ,"<< matrix[6] <<" ," << matrix[7] <<" ," << matrix[8] <<endl;
     return matrix[4];
 }
 
@@ -85,7 +85,7 @@ int median(int x,int y,Mat image){
  * median value = 2
  *
  * **/
-void medianFilter(const char *file, Mat img){
+void medianFilter(const String &file, Mat img){
     Mat image;
     Mat newImage;
     if(img.data != NULL){
@@ -98,10 +98,10 @@ void medianFilter(const char *file, Mat img){
             }
         }
     }
-    if(file != ""){
+    if(!file.empty() ){
 
 
-    image = imread(file,CV_LOAD_IMAGE_GRAYSCALE);
+    image = imread(file, CV_LOAD_IMAGE_GRAYSCALE);
 
     if(!image.data){
         // if the image failed to open output error message
