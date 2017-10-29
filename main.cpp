@@ -7,6 +7,17 @@ using namespace std;
 using namespace cv;
 
 void showImage(const char *file, const char *name);
+float meanSquaredError(Mat original, Mat filtered);
+
+//function defintions for dft
+Mat makeDFT(Mat I);
+int spectrumFilter(int x,int y,Mat image);
+Mat IDFT(Mat src);
+
+//function defintions for image sharpening
+Mat imageSharpening(Mat image,int threshold);
+float sobelMask(int x,int y, Mat image,int threshold);
+
 // function definitions for image Averaging
 Mat imageAveraging(Mat images[],int n);
 float pixelAverage(int x, int y, Mat images[],int n);
@@ -26,14 +37,30 @@ float getNeighbourhood(int x,int y,Mat image);
 
 int main() {
     cout << "Hello, World!" << endl;
+    Mat imageNoise = imread("../PandaNoise.bmp",CV_LOAD_IMAGE_GRAYSCALE);
+    Mat imageOriginal = imread("../PandaOriginal.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     showImage("../PandaNoise.bmp" ,  "Panda Noise");
+    makeDFT(imageNoise);
     // makeDFT("../PandaNoise.bmp","Panda Noise");
+    cout << "neighbourhoodAverage"<<endl;
     Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
+    meanSquaredError(imageOriginal,neigbourhoodAvg);
+    cout << "gaussianSmoothing"<<endl;
     Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
+    meanSquaredError(imageOriginal,gaussian);
+    cout << "meadian filtering"<<endl;
     Mat median = medianFilter("",neigbourhoodAvg);
-    Mat images[3] = {neigbourhoodAvg,gaussian,median};
+    meanSquaredError(imageOriginal,median);
+    cout << "image sharpening"<<endl;
+    Mat sharpen = imageSharpening(median,85);
+    meanSquaredError(imageOriginal,sharpen);
+    cout << "image averaging"<<endl;
+    Mat images[4] = {neigbourhoodAvg,gaussian,median,sharpen};
     Mat average = imageAveraging(images,3);
+    meanSquaredError(imageOriginal,average);
+
     showImage("../PandaOriginal.bmp","Panda original");
+    meanSquaredError(imageOriginal,imageNoise);
     return 0;
 }
 
@@ -53,31 +80,175 @@ void showImage(const char *file, const char *name){
     waitKey(0); // wait for the enter key to be pressed
 }
 
-void makeDFT(const char *file, const char *name){
-
-    Mat image;
-
-    image = imread(file, CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
-
-    if(! image.data )                              // Check for invalid input
-    {
-        cout <<  "Could not open or find the image" << endl ;
+/**
+ * Mean-Squared-Error (MSE)
+ * For each pixel of image A and B:
+ *      difference = A(x,y) - B(x,y)
+ *      sum += difference^2
+ *
+ * MSE = sum/(width x height)
+ * **/
+float meanSquaredError(Mat original, Mat filtered){
+    int sum = 0;
+    int no = 0;
+    for (int x=0;x<original.rows;x++){
+        for(int y=0;y<original.cols;y++){
+            int difference = original.at<uchar>(x,y)-filtered.at<uchar>(x,y);
+            sum+= pow(difference,2);
+            no++;
+        }
     }
-
-    Mat outputImage;
-
-    dft(image,outputImage);
-
-    namedWindow( name, WINDOW_AUTOSIZE );// Create a window for display.
-    imshow( name, outputImage );
-    waitKey(0);
+    float mse = sum/(original.rows * original.cols);
+    cout << "MSE = " << mse <<endl;
+    cout << "Max MSE = " << (pow(255,2)*no)/(original.rows * original.cols)<<endl;
+    return mse;
+}
 
 
+// https://docs.opencv.org/2.4/doc/tutorials/core/discrete_fourier_transform/discrete_fourier_transform.html
+Mat makeDFT(Mat I){
+
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( I.rows );
+    int n = getOptimalDFTSize( I.cols ); // on the border add zero values
+    copyMakeBorder(I, padded, 0, m - I.rows, 0, n - I.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat complexI;
+    merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
+
+    dft(complexI, complexI);            // this way the result may fit in the source matrix
+
+    // compute the magnitude and switch to logarithmic scale
+    // => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
+    split(complexI, planes);                   // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
+    magnitude(planes[0], planes[1], planes[0]);// planes[0] = magnitude
+    Mat magI = planes[0];
+
+    magI += Scalar::all(1);                    // switch to logarithmic scale
+    log(magI, magI);
+
+    // crop the spectrum, if it has an odd number of rows or columns
+    magI = magI(Rect(0, 0, magI.cols & -2, magI.rows & -2));
+
+    // rearrange the quadrants of Fourier image  so that the origin is at the image center
+    int cx = magI.cols/2;
+    int cy = magI.rows/2;
+
+    Mat q0(magI, Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
+    Mat q1(magI, Rect(cx, 0, cx, cy));  // Top-Right
+    Mat q2(magI, Rect(0, cy, cx, cy));  // Bottom-Left
+    Mat q3(magI, Rect(cx, cy, cx, cy)); // Bottom-Right
+
+    Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+
+    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+
+    normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
+    // viewable image form (float between values 0 and 1).
+
+
+    imshow("spectrum magnitude", magI);
+    waitKey();
+
+   // IDFT(magI);
+    return magI;
+
+}
+
+/**
+ * DFT filter
+ * */
+int spectrumFilter(int x,int y,Mat image){
+    if(image.at<uchar>(x,y)>150){
+        return 0;
+    } else{
+        return image.at<uchar>(x,y);
+    }
 }
 
 void makeFFT(){
 
 }
+
+/**
+ * Image Sharpening
+ *
+ *Sobel algorithm used
+ *
+ *  _  _  _
+ * |-1|-2|-1|
+ * | 0| 0| 0|
+ * | 1| 2| 1|
+ *  _  _  _
+ * |-1| 0| 1|
+ * |-2| 0| 2|
+ * |-1| 0| 1|
+ *
+ * **/
+Mat imageSharpening(Mat image,int threshold){
+    Mat newImage;
+    Mat edgeImage;
+    newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+    edgeImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+    // create edge outline of image
+    for(int x=0;x<image.rows;x++){
+        for(int y=0;y<image.cols;y++){
+            edgeImage.at<uchar>(x,y) = sobelMask(x,y,image,threshold);
+        }
+    }
+    namedWindow( "edge mask", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "edge mask", edgeImage );
+    waitKey(0);
+    // add the outline to the image with a scaling factor of 0.25 to not approach the max value
+    for(int x=0;x<image.rows;x++){
+        for(int y=0;y<image.cols;y++){
+            newImage.at<uchar>(x,y) = image.at<uchar>(x,y) + (edgeImage.at<uchar>(x,y)*0.25) ;
+        }
+    }
+    namedWindow( "sharpened image", WINDOW_AUTOSIZE );// Create a window for display.
+    imshow( "sharpened image", newImage );
+    waitKey(0);
+
+    return newImage;
+}
+
+/**create the outline of the image
+ *  _ _ _
+ * |a|b|c|
+ * |d|e|f|
+ * |g|h|i|
+ *
+ * S(e) = 1/8 [|(a + 2b + c)-(g + 2h +i)|]
++ |(a + 2d + g) - (c + 2f + i)|]
+ * **/
+float sobelMask(int x,int y, Mat image,int threshold){
+    // work out the values of each pixel in the neighbourhood
+    int m11 = image.at<uchar>(x-1,y-1);
+    int m12 = image.at<uchar>(x,y-1);
+    int m13 = image.at<uchar>(x+1,y-1);
+    int m21 = image.at<uchar>(x-1,y);
+    int m22 = image.at<uchar>(x,y);
+    int m23 = image.at<uchar>(x+1,y);
+    int m31 = image.at<uchar>(x-1,y+1);
+    int m32 = image.at<uchar>(x,y+1);
+    int m33 = image.at<uchar>(x+1,y+1);
+    // if the pixel is less than the threshold then make the pixel at (x,y) 0
+    if(m22<threshold){
+        return 0;
+    }
+    // cout << m11 <<" ,"<< m12 <<" ," << m13 <<" ," << m21 <<" ," << m22 <<" ,"<< m23  <<" ,"<< m31 <<" ," << m32 <<" ," << m33 <<endl;
+    //cout<< (1/8)*abs((m11+(2*m12)+m13)-(m31+(2*m32)+m33))+abs((m11+(2*m21)+m31)-(m13+(2*m23)+m33)) <<endl;
+    // get the sobel operation using the equation and matrix data
+    float sobelOp = (1/8)*abs((m11+(2*m12)+m13)-(m31+(2*m32)+m33))+abs((m11+(2*m21)+m31)-(m13+(2*m23)+m33));
+    return sobelOp;
+}
+
 
 /**
  * Image Averaging
@@ -225,19 +396,44 @@ Mat gaussianSmoothing(const char *file, const char *name){
     return newImage;
 }
 
+
+/**
+ * _  _  _  _
+ * |1 |4 |7 |4 |1 |
+ * |4 |16|26|16|4 |
+ * |7 |26|41|26|7 |
+ * |4 |16|26|16|4 |
+ * |1 |4 |7 |4 |1 |
+ * */
 float getGaussianSmoothing(int x,int y,Mat image){
     // work out the values of each pixel in the neighbourhood
-    int m11 = image.at<uchar>(x-1,y-1)*16;
-    int m12 = image.at<uchar>(x,y-1)*26;
-    int m13 = image.at<uchar>(x+1,y-1)*16;
-    int m21 = image.at<uchar>(x-1,y)*26;
-    int m22 = image.at<uchar>(x,y)*41;
-    int m23 = image.at<uchar>(x+1,y)*26;
-    int m31 = image.at<uchar>(x-1,y+1)*16;
-    int m32 = image.at<uchar>(x,y+1)*26;
-    int m33 = image.at<uchar>(x+1,y+1)*16;
+    int m11 = image.at<uchar>(x-2,y-2)*1;
+    int m12 = image.at<uchar>(x-1,y-2)*4;
+    int m13 = image.at<uchar>(x,y-2)*7;
+    int m14 = image.at<uchar>(x+1,y-2)*4;
+    int m15 = image.at<uchar>(x+2,y-2)*1;
+    int m21 = image.at<uchar>(x-2,y-1)*4;
+    int m22 = image.at<uchar>(x-1,y-1)*16;
+    int m23 = image.at<uchar>(x,y-1)*26;
+    int m24 = image.at<uchar>(x+1,y-1)*16;
+    int m25 = image.at<uchar>(x+2,y-1)*4;
+    int m31 = image.at<uchar>(x-2,y)*7;
+    int m32 = image.at<uchar>(x-1,y)*26;
+    int m33 = image.at<uchar>(x,y)*41;
+    int m34 = image.at<uchar>(x+1,y)*26;
+    int m35 = image.at<uchar>(x+2,y)*7;
+    int m41 = image.at<uchar>(x-2,y)*4;
+    int m42 = image.at<uchar>(x-1,y+1)*16;
+    int m43 = image.at<uchar>(x,y+1)*26;
+    int m44 = image.at<uchar>(x+1,y+1)*16;
+    int m45 = image.at<uchar>(x+2,y+1)*4;
+    int m51 = image.at<uchar>(x-2,y+2)*1;
+    int m52 = image.at<uchar>(x-1,y+2)*4;
+    int m53 = image.at<uchar>(x,y+2)*7;
+    int m54 = image.at<uchar>(x+1,y+2)*4;
+    int m55 = image.at<uchar>(x+2,y+2)*1;
     // sum up all the pixels and take the average
-    return (1/209.0)*(m11+m12+m13+m21+m22+m23+m31+m32+m33);
+    return (1/273.0)*(m11+m12+m13+m14+m15+m21+m22+m23+m24+m25+m31+m32+m33+m34+m35+m41+m42+m43+m44+m45+m51+m52+m53+m54+m55);
 }
 
 /**
