@@ -6,7 +6,7 @@
 using namespace std;
 using namespace cv;
 
-void showImage(const char *file, const char *name);
+void showImage(Mat image, const char *name);
 float meanSquaredError(Mat original, Mat filtered);
 
 //function defintions for dft
@@ -23,15 +23,15 @@ Mat imageAveraging(Mat images[],int n);
 float pixelAverage(int x, int y, Mat images[],int n);
 
 // function definitions for median filtering
-Mat medianFilter(const String &file, Mat img);
+Mat medianFilter(Mat img);
 int median(int x,int y,Mat image);
 void getMatrix(int x,int y,Mat image, int matrix[]);
 
 // function definitions for gaussian smoothing
-Mat gaussianSmoothing(const char *file, const char *name);
+Mat gaussianSmoothing(Mat image);
 float getGaussianSmoothing(int x,int y,Mat image);
 // function definitions for neighbourhood averaging
-Mat neighbourhoodAverage(const char *file, const char *name);
+Mat neighbourhoodAverage(Mat image);
 float getNeighbourhood(int x,int y,Mat image);
 
 
@@ -39,19 +39,19 @@ int main() {
     cout << "Hello, World!" << endl;
     Mat imageNoise = imread("../PandaNoise.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     Mat imageOriginal = imread("../PandaOriginal.bmp",CV_LOAD_IMAGE_GRAYSCALE);
-    showImage("../PandaNoise.bmp" ,  "Panda Noise");
+    showImage(imageNoise ,  "Panda Noise");
     //Mat dftOriginal = makeDFT(imageOriginal);
     Mat dft = makeDFT(imageNoise);
     inverseDFT(dft);
     // makeDFT("../PandaNoise.bmp","Panda Noise");
     cout << "neighbourhoodAverage"<<endl;
-    Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
+    Mat neigbourhoodAvg =  neighbourhoodAverage(imageNoise);
     meanSquaredError(imageOriginal,neigbourhoodAvg);
     cout << "gaussianSmoothing"<<endl;
-    Mat gaussian = gaussianSmoothing("../PandaNoise.bmp","Panda Noise");
+    Mat gaussian = gaussianSmoothing(imageNoise);
     meanSquaredError(imageOriginal,gaussian);
     cout << "meadian filtering"<<endl;
-    Mat median = medianFilter("",neigbourhoodAvg);
+    Mat median = medianFilter(neigbourhoodAvg);
     meanSquaredError(imageOriginal,median);
     cout << "image sharpening"<<endl;
     Mat sharpen = imageSharpening(median,85);
@@ -61,20 +61,12 @@ int main() {
     Mat average = imageAveraging(images,3);
     meanSquaredError(imageOriginal,average);
 
-    showImage("../PandaOriginal.bmp","Panda original");
+    showImage(imageOriginal,"Panda original");
     meanSquaredError(imageOriginal,imageNoise);
     return 0;
 }
 
-void showImage(const char *file, const char *name){
-    Mat image;
-
-    image = imread(file, CV_LOAD_IMAGE_COLOR);   // Read the file
-
-    if(! image.data )                              // Check for invalid input
-    {
-        cout <<  "Could not open or find the image" << endl ;
-    }
+void showImage(Mat image, const char *name){
 
     namedWindow( name, WINDOW_AUTOSIZE );// Create a window for display.
     imshow( name, image );                   // Show our image inside it.
@@ -158,14 +150,21 @@ Mat makeDFT(Mat I){
     imshow("spectrum magnitude", magI);
     waitKey();
 
-    return magI;
+
+
+    return complexI;
 
 }
 
+/**
+ * Inverse DFT function
+ * @param source Mat returned from dft with both Complex and real components
+ * **/
 Mat inverseDFT(Mat source){
     Mat inverse = Mat::zeros(source.rows,source.cols, CV_8UC1);
-    dft(source,source,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
-    imshow("inverse dft",source);
+    dft(source,inverse,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
+    normalize(inverse, inverse, 0, 1, CV_MINMAX);
+    imshow("inverse dft",inverse);
     waitKey();
     return inverse;
 
@@ -302,7 +301,7 @@ float pixelAverage(int x, int y, Mat images[],int n){
  * median value = 2
  *
  * **/
-Mat medianFilter(const String &file, Mat img){
+Mat medianFilter(Mat img){
     Mat image;
     Mat newImage;
     if(img.data != NULL){
@@ -315,26 +314,7 @@ Mat medianFilter(const String &file, Mat img){
             }
         }
     }
-    if(!file.empty() ){
 
-
-    image = imread(file, CV_LOAD_IMAGE_GRAYSCALE);
-
-    if(!image.data){
-        // if the image failed to open output error message
-        cout << "Image failed to open" << endl;
-    } else{
-        // create a new image the size of the old one with 8 bits on once channel (greyscale)
-        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
-        for(int x=0;x<image.rows;x++){
-            for(int y=0;y<image.cols;y++){
-
-                newImage.at<uchar>(x,y) = median(x,y,image);
-            }
-        }
-
-    }
-    }
     namedWindow( "median filter", WINDOW_AUTOSIZE );// Create a window for display.
     imshow( "median filter", newImage );
     waitKey(0);
@@ -378,23 +358,16 @@ int median(int x,int y,Mat image){
  * **/
 
 
-Mat gaussianSmoothing(const char *file, const char *name){
+Mat gaussianSmoothing(Mat image){
     // neighbourhood averaging
-    Mat image;
     Mat newImage;
-    image = imread(file,CV_LOAD_IMAGE_GRAYSCALE);
 
-    if(!image.data){
-        // if the image failed to open output error message
-        cout << "Image failed to open" << endl;
-    } else{
-        // create a new image the size of the old one with 8 bits on once channel (greyscale)
-        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
-        for(int x=0;x<image.rows;x++){
-            for(int y=0;y<image.cols;y++){
-                // For each pixel get the neighbourhood of pixels and get the average from them
-                newImage.at<uchar>(x,y) = getGaussianSmoothing(x, y, image);
-            }
+    // create a new image the size of the old one with 8 bits on once channel (greyscale)
+    newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+    for(int x=0;x<image.rows;x++){
+        for(int y=0;y<image.cols;y++){
+            // For each pixel get the neighbourhood of pixels and get the average from them
+            newImage.at<uchar>(x,y) = getGaussianSmoothing(x, y, image);
         }
     }
 
@@ -455,23 +428,16 @@ float getGaussianSmoothing(int x,int y,Mat image){
  * |_|x|_|
  * |_|_|_|
  * **/
-Mat neighbourhoodAverage(const char *file, const char *name){
+Mat neighbourhoodAverage(Mat image){
     // neighbourhood averaging
-    Mat image;
-    Mat newImage;
-    image = imread(file,CV_LOAD_IMAGE_GRAYSCALE);
 
-    if(!image.data){
-        // if the image failed to open output error message
-        cout << "Image failed to open" << endl;
-    } else{
-        // create a new image the size of the old one with 8 bits on once channel (greyscale)
-        newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
-        for(int x=0;x<image.rows;x++){
-            for(int y=0;y<image.cols;y++){
-                // For each pixel get the neighbourhood of pixels and get the average from them
-                    newImage.at<uchar>(x,y) = getNeighbourhood(x, y, image);
-            }
+    Mat newImage;
+    // create a new image the size of the old one with 8 bits on once channel (greyscale)
+    newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
+    for(int x=0;x<image.rows;x++){
+        for(int y=0;y<image.cols;y++){
+            // For each pixel get the neighbourhood of pixels and get the average from them
+                newImage.at<uchar>(x,y) = getNeighbourhood(x, y, image);
         }
     }
 
