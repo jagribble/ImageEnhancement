@@ -12,7 +12,7 @@ float meanSquaredError(Mat original, Mat filtered);
 //function defintions for dft
 Mat makeDFT(Mat I);
 int spectrumFilter(int x,int y,Mat image);
-Mat IDFT(Mat src);
+Mat inverseDFT(Mat source);
 
 //function defintions for image sharpening
 Mat imageSharpening(Mat image,int threshold);
@@ -40,7 +40,9 @@ int main() {
     Mat imageNoise = imread("../PandaNoise.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     Mat imageOriginal = imread("../PandaOriginal.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     showImage("../PandaNoise.bmp" ,  "Panda Noise");
-    makeDFT(imageNoise);
+    //Mat dftOriginal = makeDFT(imageOriginal);
+    Mat dft = makeDFT(imageNoise);
+    inverseDFT(dft);
     // makeDFT("../PandaNoise.bmp","Panda Noise");
     cout << "neighbourhoodAverage"<<endl;
     Mat neigbourhoodAvg =  neighbourhoodAverage("../PandaNoise.bmp","Panda Noise");
@@ -156,8 +158,16 @@ Mat makeDFT(Mat I){
     imshow("spectrum magnitude", magI);
     waitKey();
 
-   // IDFT(magI);
     return magI;
+
+}
+
+Mat inverseDFT(Mat source){
+    Mat inverse = Mat::zeros(source.rows,source.cols, CV_8UC1);
+    dft(source,source,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
+    imshow("inverse dft",source);
+    waitKey();
+    return inverse;
 
 }
 
