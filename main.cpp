@@ -11,8 +11,11 @@ float meanSquaredError(Mat original, Mat filtered);
 
 //function defintions for dft
 Mat makeDFT(Mat I);
-int spectrumFilter(int x,int y,Mat image);
 Mat inverseDFT(Mat source);
+Mat createMask(int width,int height,int xSize, int ySize,int lineSize);
+void swapQuadrants(Mat& img);
+Mat applyFilter(Mat maskFilter,Mat dft);
+Mat frequencyDomainLowPass(Mat original, int size);
 
 //function defintions for image sharpening
 Mat imageSharpening(Mat image,int threshold);
@@ -40,9 +43,9 @@ int main() {
     Mat imageNoise = imread("../PandaNoise.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     Mat imageOriginal = imread("../PandaOriginal.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     showImage(imageNoise ,  "Panda Noise");
-    //Mat dftOriginal = makeDFT(imageOriginal);
-    Mat dft = makeDFT(imageNoise);
-    inverseDFT(dft);
+   // Mat dftOriginal = makeDFT(imageOriginal);
+
+    frequencyDomainLowPass(imageNoise,30);
     // makeDFT("../PandaNoise.bmp","Panda Noise");
     cout << "neighbourhoodAverage"<<endl;
     Mat neigbourhoodAvg =  neighbourhoodAverage(imageNoise);
@@ -74,6 +77,128 @@ void showImage(Mat image, const char *name){
     waitKey(0); // wait for the enter key to be pressed
 }
 
+
+
+// https://docs.opencv.org/2.4/doc/tutorials/core/discrete_fourier_transform/discrete_fourier_transform.html
+Mat makeDFT(Mat I){
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( I.rows );
+    int n = getOptimalDFTSize( I.cols ); // on the border add zero values
+    copyMakeBorder(I, padded, 0, m - I.rows, 0, n - I.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat complexI;
+    merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
+
+    dft(complexI, complexI);            // this way the result may fit in the source matrix
+
+    // compute the magnitude and switch to logarithmic scale
+    // => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
+    split(complexI, planes);                   // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
+    magnitude(planes[0], planes[1], planes[0]);// planes[0] = magnitude
+    Mat magI = planes[0];
+
+    magI += Scalar::all(1);                    // switch to logarithmic scale
+    log(magI, magI);
+
+    swapQuadrants(magI);
+
+
+    normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
+    // viewable image form (float between values 0 and 1).
+
+
+    imshow("spectrum magnitude", magI);
+    waitKey();
+
+    return complexI;
+
+}
+
+void swapQuadrants(Mat& img){
+// crop the spectrum, if it has an odd number of rows or columns
+    img = img(Rect(0, 0, img.cols & -2, img.rows & -2));
+
+    // rearrange the quadrants of Fourier image  so that the origin is at the image center
+    int cx = img.cols/2;
+    int cy = img.rows/2;
+
+    Mat q0(img, Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
+    Mat q1(img, Rect(cx, 0, cx, cy));  // Top-Right
+    Mat q2(img, Rect(0, cy, cx, cy));  // Bottom-Left
+    Mat q3(img, Rect(cx, cy, cx, cy)); // Bottom-Right
+
+    Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+
+    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+}
+
+
+
+/**
+ * Inverse DFT function
+ * @param source Mat returned from dft with both Complex and real components
+ * **/
+Mat inverseDFT(Mat source){
+    Mat inverse = Mat::zeros(source.rows,source.cols, CV_8UC1);
+    dft(source,inverse,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
+    normalize(inverse, inverse, 0, 1, CV_MINMAX);
+    imshow("inverse dft",inverse);
+    waitKey();
+    return inverse;
+
+}
+
+/**
+ * Create a mask at a point and size.
+ * @param lineSize if -1 filled in
+ * **/
+Mat createMask(int width,int height,int xSize, int ySize,int lineSize){
+    Mat mask = Mat::zeros(width, height, CV_32F);;
+    ellipse(mask, Point(width/2, height/2), Size(xSize, ySize), 0, 0, 360, Scalar(255, 0, 0), lineSize, 8);
+    normalize(mask, mask, 0, 1, CV_MINMAX);
+    return mask;
+}
+
+Mat applyFilter(Mat maskFilter,Mat dft){
+    Mat result;
+    // multiply the dft and the mask together
+    mulSpectrums(dft, maskFilter, result, 0);
+    return result;
+}
+
+Mat frequencyDomainLowPass(Mat original, int size){
+    // get the dft of the image
+    Mat dft = makeDFT(original);
+    // create the low pass mask
+    Mat mask = createMask(original.rows,original.cols,size,size,-1);
+    imshow("mask",mask);
+    waitKey();
+    // swap the quedarants of the mask to match the dft
+    swapQuadrants(mask);
+    imshow("swaped quadrant mask",mask);
+    waitKey();
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( mask.rows );
+    int n = getOptimalDFTSize( mask.cols ); // on the border add zero values
+    copyMakeBorder(mask, padded, 0, m - mask.rows, 0, n - mask.cols, BORDER_CONSTANT, Scalar::all(0));
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat maskComplex;
+    merge(planes, 2, maskComplex);
+    // apply the filter to the dft
+    Mat filteredDFT = applyFilter(maskComplex,dft);
+
+    //take the inverse of the filtered DFT
+    inverseDFT(filteredDFT);
+    return filteredDFT;
+}
+
+
 /**
  * Mean-Squared-Error (MSE)
  * For each pixel of image A and B:
@@ -99,87 +224,6 @@ float meanSquaredError(Mat original, Mat filtered){
 }
 
 
-// https://docs.opencv.org/2.4/doc/tutorials/core/discrete_fourier_transform/discrete_fourier_transform.html
-Mat makeDFT(Mat I){
-
-    Mat padded;                            //expand input image to optimal size
-    int m = getOptimalDFTSize( I.rows );
-    int n = getOptimalDFTSize( I.cols ); // on the border add zero values
-    copyMakeBorder(I, padded, 0, m - I.rows, 0, n - I.cols, BORDER_CONSTANT, Scalar::all(0));
-
-    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
-    Mat complexI;
-    merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
-
-    dft(complexI, complexI);            // this way the result may fit in the source matrix
-
-    // compute the magnitude and switch to logarithmic scale
-    // => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
-    split(complexI, planes);                   // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
-    magnitude(planes[0], planes[1], planes[0]);// planes[0] = magnitude
-    Mat magI = planes[0];
-
-    magI += Scalar::all(1);                    // switch to logarithmic scale
-    log(magI, magI);
-
-    // crop the spectrum, if it has an odd number of rows or columns
-    magI = magI(Rect(0, 0, magI.cols & -2, magI.rows & -2));
-
-    // rearrange the quadrants of Fourier image  so that the origin is at the image center
-    int cx = magI.cols/2;
-    int cy = magI.rows/2;
-
-    Mat q0(magI, Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
-    Mat q1(magI, Rect(cx, 0, cx, cy));  // Top-Right
-    Mat q2(magI, Rect(0, cy, cx, cy));  // Bottom-Left
-    Mat q3(magI, Rect(cx, cy, cx, cy)); // Bottom-Right
-
-    Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
-    q0.copyTo(tmp);
-    q3.copyTo(q0);
-    tmp.copyTo(q3);
-
-    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
-    q2.copyTo(q1);
-    tmp.copyTo(q2);
-
-    normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
-    // viewable image form (float between values 0 and 1).
-
-
-    imshow("spectrum magnitude", magI);
-    waitKey();
-
-
-
-    return complexI;
-
-}
-
-/**
- * Inverse DFT function
- * @param source Mat returned from dft with both Complex and real components
- * **/
-Mat inverseDFT(Mat source){
-    Mat inverse = Mat::zeros(source.rows,source.cols, CV_8UC1);
-    dft(source,inverse,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
-    normalize(inverse, inverse, 0, 1, CV_MINMAX);
-    imshow("inverse dft",inverse);
-    waitKey();
-    return inverse;
-
-}
-
-/**
- * DFT filter
- * */
-int spectrumFilter(int x,int y,Mat image){
-    if(image.at<uchar>(x,y)>150){
-        return 0;
-    } else{
-        return image.at<uchar>(x,y);
-    }
-}
 
 void makeFFT(){
 
