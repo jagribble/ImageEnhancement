@@ -10,12 +10,14 @@ void showImage(Mat image, const char *name);
 float meanSquaredError(Mat original, Mat filtered);
 
 //function defintions for dft
-Mat makeDFT(Mat I);
-Mat inverseDFT(Mat source);
+Mat makeDFT(Mat I,const char *name);
+Mat inverseDFT(Mat source,const char *name);
 Mat createMask(int width,int height,int xSize, int ySize,int lineSize);
 void swapQuadrants(Mat& img);
 Mat applyFilter(Mat maskFilter,Mat dft);
 Mat frequencyDomainLowPass(Mat original, int size);
+Mat frequencyDomainHighPass(Mat original, int size);
+Mat frequencyDomainBandPass(Mat original, int size);
 
 //function defintions for image sharpening
 Mat imageSharpening(Mat image,int threshold);
@@ -44,8 +46,15 @@ int main() {
     Mat imageOriginal = imread("../PandaOriginal.bmp",CV_LOAD_IMAGE_GRAYSCALE);
     showImage(imageNoise ,  "Panda Noise");
    // Mat dftOriginal = makeDFT(imageOriginal);
-
-    frequencyDomainLowPass(imageNoise,30);
+    cout << "Low pass in the frequency domain"<<endl;
+    Mat lowPass = frequencyDomainLowPass(imageNoise,40);
+   // imageSharpening(lowPass,200);
+    meanSquaredError(imageOriginal,lowPass);
+    cout << "High pass in the frequency domain"<<endl;
+    Mat highPass = frequencyDomainHighPass(imageNoise,30);
+    meanSquaredError(imageOriginal,highPass);
+    cout << "Band pass in the frequency domain"<<endl;
+    frequencyDomainBandPass(imageNoise,30);
     // makeDFT("../PandaNoise.bmp","Panda Noise");
     cout << "neighbourhoodAverage"<<endl;
     Mat neigbourhoodAvg =  neighbourhoodAverage(imageNoise);
@@ -80,7 +89,7 @@ void showImage(Mat image, const char *name){
 
 
 // https://docs.opencv.org/2.4/doc/tutorials/core/discrete_fourier_transform/discrete_fourier_transform.html
-Mat makeDFT(Mat I){
+Mat makeDFT(Mat I,const char *name){
     Mat padded;                            //expand input image to optimal size
     int m = getOptimalDFTSize( I.rows );
     int n = getOptimalDFTSize( I.cols ); // on the border add zero values
@@ -108,7 +117,7 @@ Mat makeDFT(Mat I){
     // viewable image form (float between values 0 and 1).
 
 
-    imshow("spectrum magnitude", magI);
+    imshow(name, magI);
     waitKey();
 
     return complexI;
@@ -144,11 +153,11 @@ void swapQuadrants(Mat& img){
  * Inverse DFT function
  * @param source Mat returned from dft with both Complex and real components
  * **/
-Mat inverseDFT(Mat source){
+Mat inverseDFT(Mat source,const char *name){
     Mat inverse = Mat::zeros(source.rows,source.cols, CV_8UC1);
     dft(source,inverse,DFT_INVERSE|DFT_REAL_OUTPUT|DFT_SCALE);
     normalize(inverse, inverse, 0, 1, CV_MINMAX);
-    imshow("inverse dft",inverse);
+    imshow(name,inverse);
     waitKey();
     return inverse;
 
@@ -159,8 +168,8 @@ Mat inverseDFT(Mat source){
  * @param lineSize if -1 filled in
  * **/
 Mat createMask(int width,int height,int xSize, int ySize,int lineSize){
-    Mat mask = Mat::zeros(width, height, CV_32F);;
-    ellipse(mask, Point(width/2, height/2), Size(xSize, ySize), 0, 0, 360, Scalar(255, 0, 0), lineSize, 8);
+    Mat mask = Mat::zeros(width, height, CV_32F);
+    ellipse(mask, Point(384/2, 216/2), Size(xSize, ySize), 0, 0, 360, Scalar(255, 0, 0), lineSize, 8);
     normalize(mask, mask, 0, 1, CV_MINMAX);
     return mask;
 }
@@ -174,14 +183,14 @@ Mat applyFilter(Mat maskFilter,Mat dft){
 
 Mat frequencyDomainLowPass(Mat original, int size){
     // get the dft of the image
-    Mat dft = makeDFT(original);
+    Mat dft = makeDFT(original,"low pass spectrum");
     // create the low pass mask
     Mat mask = createMask(original.rows,original.cols,size,size,-1);
-    imshow("mask",mask);
+    imshow("low pass mask",mask);
     waitKey();
     // swap the quedarants of the mask to match the dft
     swapQuadrants(mask);
-    imshow("swaped quadrant mask",mask);
+    imshow("swaped quadrant low pass mask",mask);
     waitKey();
     Mat padded;                            //expand input image to optimal size
     int m = getOptimalDFTSize( mask.rows );
@@ -194,8 +203,62 @@ Mat frequencyDomainLowPass(Mat original, int size){
     Mat filteredDFT = applyFilter(maskComplex,dft);
 
     //take the inverse of the filtered DFT
-    inverseDFT(filteredDFT);
-    return filteredDFT;
+    Mat inverse = inverseDFT(filteredDFT,"low pass inverse");
+    return inverse;
+}
+
+Mat frequencyDomainBandPass(Mat original, int size){
+    // get the dft of the image
+    Mat dft = makeDFT(original,"band pass spectrum");
+    // create the band pass mask
+    Mat mask = createMask(original.rows,original.cols,size,size,30);
+    imshow("band pass mask",mask);
+    waitKey();
+    // swap the quedarants of the mask to match the dft
+    swapQuadrants(mask);
+    imshow("swaped quadrant band pass mask",mask);
+    waitKey();
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( mask.rows );
+    int n = getOptimalDFTSize( mask.cols ); // on the border add zero values
+    copyMakeBorder(mask, padded, 0, m - mask.rows, 0, n - mask.cols, BORDER_CONSTANT, Scalar::all(0));
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat maskComplex;
+    merge(planes, 2, maskComplex);
+    // apply the filter to the dft
+    Mat filteredDFT = applyFilter(maskComplex,dft);
+
+    //take the inverse of the filtered DFT
+    Mat inverse = inverseDFT(filteredDFT,"band pass inverse");
+    return inverse;
+}
+
+Mat frequencyDomainHighPass(Mat original, int size){
+    // get the dft of the image
+    Mat dft = makeDFT(original,"High pass spectrum");
+    // create the low pass filter mask
+    Mat mask = createMask(original.rows,original.cols,size,size,-1);
+    // invert the mask to create a high pass filter
+    mask = Mat::ones(mask.size(),CV_32F) - mask;
+    imshow("high pass mask",mask);
+    waitKey();
+    // swap the quedarants of the mask to match the dft
+    swapQuadrants(mask);
+    imshow("swaped quadrant high pass mask",mask);
+    waitKey();
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( mask.rows );
+    int n = getOptimalDFTSize( mask.cols ); // on the border add zero values
+    copyMakeBorder(mask, padded, 0, m - mask.rows, 0, n - mask.cols, BORDER_CONSTANT, Scalar::all(0));
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat maskComplex;
+    merge(planes, 2, maskComplex);
+    // apply the filter to the dft
+    Mat filteredDFT = applyFilter(maskComplex,dft);
+
+    //take the inverse of the filtered DFT
+    Mat inverse = inverseDFT(filteredDFT,"high pass inverse");
+    return inverse;
 }
 
 
@@ -247,6 +310,8 @@ void makeFFT(){
 Mat imageSharpening(Mat image,int threshold){
     Mat newImage;
     Mat edgeImage;
+    imshow("input to sharpen",image);
+    waitKey();
     newImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
     edgeImage = Mat::zeros(image.rows,image.cols, CV_8UC1);
     // create edge outline of image
