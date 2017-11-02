@@ -479,11 +479,13 @@ int median(int x,int y,Mat image){
 /**
  *  (0,0) in top left corner
  *
- *  Take the average from each of the 9 pixels in the neighbourhood
- *  _  _  _
- * |16|26|16|
- * |26|41|26|
- * |16|26|16|
+ *  Take the average from each of the 25 pixels in the neighbourhood
+ *  
+ * |1 |4 |7 |4 |1 |
+ * |4 |16|26|16|4 |
+ * |7 |26|41|26|7 |
+ * |4 |16|26|16|4 |
+ * |1 |4 |7 |4 |1 |
  * **/
 
 
