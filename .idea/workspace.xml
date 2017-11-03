@@ -35,8 +35,8 @@
       <file leaf-file-name="main.cpp" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.cpp">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="126">
-              <caret line="482" column="4" lean-forward="false" selection-start-line="482" selection-start-column="4" selection-end-line="482" selection-end-column="4" />
+            <state relative-caret-position="286">
+              <caret line="305" column="35" lean-forward="true" selection-start-line="305" selection-start-column="35" selection-end-line="305" selection-end-column="35" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
               </folding>
@@ -51,6 +51,9 @@
       <find>median</find>
       <find>sort</find>
       <find>Mat</find>
+      <find>mul</find>
+      <find>applyFilter</find>
+      <find>createMask</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -178,12 +181,12 @@
       <workItem from="1508790971764" duration="286000" />
       <workItem from="1508791292410" duration="133000" />
       <workItem from="1508791468737" duration="10233000" />
-      <workItem from="1509095095176" duration="58361000" />
+      <workItem from="1509095095176" duration="63988000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="70745000" />
+    <option name="totallyTimeSpent" value="76372000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -454,8 +457,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/main.cpp">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="126">
-          <caret line="482" column="4" lean-forward="false" selection-start-line="482" selection-start-column="4" selection-end-line="482" selection-end-column="4" />
+        <state relative-caret-position="286">
+          <caret line="305" column="35" lean-forward="true" selection-start-line="305" selection-start-column="35" selection-end-line="305" selection-end-column="35" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>

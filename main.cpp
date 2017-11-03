@@ -480,7 +480,7 @@ int median(int x,int y,Mat image){
  *  (0,0) in top left corner
  *
  *  Take the average from each of the 25 pixels in the neighbourhood
- *  
+ *
  * |1 |4 |7 |4 |1 |
  * |4 |16|26|16|4 |
  * |7 |26|41|26|7 |
